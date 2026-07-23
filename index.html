@@ -205,11 +205,11 @@
       <div class="control-group">
         <label for="media">Propagation Medium</label>
         <select id="media">
-          <option value="air">Atmospheric Air (α ≈ 1×10⁻⁵ m⁻¹)</option>
-          <option value="seawater">Seawater (α ≈ 0.008 m⁻¹ reduced for SLW)</option>
-          <option value="earth">Earth Crust / Soil (α ≈ 0.004 m⁻¹)</option>
+          <option value="air">Atmospheric Air (α residual ≈ 1×10⁻⁵ m⁻¹)</option>
+          <option value="seawater">Seawater (α residual ≈ 5×10⁻⁴ m⁻¹ — no skin effect)</option>
+          <option value="earth">Earth Crust / Soil (α residual ≈ 2×10⁻⁴ m⁻¹ — no skin effect)</option>
           <option value="space">Outer Space / Vacuum (α = 0)</option>
-          <option value="transition">Air → Space Transition (variable α)</option>
+          <option value="transition">Air → Space Transition (α falls with altitude)</option>
         </select>
       </div>
       <div class="control-group">
@@ -222,7 +222,7 @@
     <div class="panel nz">
       <h2><span class="badge badge-nz">NZ</span> Nikolova–Zimmerman Configuration</h2>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.8rem;">
-        Longitudinally-polarized magnetic vector potential A. Transverse EM fields minimized in the far zone; potential wave propagates from the open end of the single wire.
+        Longitudinally-polarized magnetic vector potential A. Transverse EM fields minimized in the far zone; potential wave propagates from the open end of the single wire. Lorenz gauge (paper Eq. 9) sets the propagation speed to c of the medium.
       </p>
       <div class="schematic">
         <canvas id="nzCanvas" class="wave-canvas"></canvas>
@@ -245,7 +245,7 @@
     <div class="panel hively">
       <h2><span class="badge badge-h">Hively</span> Hively Configuration (EED / MCE)</h2>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.8rem;">
-        Gradient-driven current on linear monopole (with balun). Produces longitudinal electric field E<sub>r</sub> and scalar field C with B ≈ 0. SLW radiates from the tip.
+        Gradient-driven current on linear monopole (with balun). Produces longitudinal electric field E<sub>r</sub> and scalar field C with B ≈ 0. SLW radiates from the tip. No classical skin effect.
       </p>
       <div class="schematic">
         <canvas id="hCanvas" class="wave-canvas"></canvas>
@@ -266,12 +266,12 @@
     </div>
 
     <div class="note">
-      <strong>Physical model notes (approximate, consistent with published descriptions):</strong><br>
+      <strong>Important physical model notes (corrected):</strong><br>
+      • <strong>There is no classical skin effect for the longitudinal / potential waves.</strong> The irrotational vector potential A (Nikolova–Zimmerman) and the longitudinal electric field E<sub>r</sub> + scalar field C (Hively) do not induce the eddy currents that produce the ordinary skin effect of transverse TEM waves. Consequently the attenuation constants α used here are residual (geometric + very weak material interaction) and are many orders of magnitude smaller than the classical skin-effect values that would apply to ordinary EM waves in seawater or earth.<br>
       • Both configurations use a single-wire / linear monopole driven by modulated current. Classical transverse TEM fields form concentrically around the wire body; the longitudinal / potential component is strongest at the open tip where the return path is cancelled (balun or open end).<br>
-      • <strong>Nikolova–Zimmerman:</strong> |A|(r) ≈ (μ₀ · I · L<sub>eff</sub>)/(4π r) · e<sup>−αr</sup> &nbsp;&nbsp;(L<sub>eff</sub> = 0.15 m). Units: V·s/m (Wb/m).<br>
-      • <strong>Hively:</strong> |E<sub>r</sub>|(r) ≈ (η₀ · I · κ)/(2π r) · e<sup>−αr</sup> &nbsp;&nbsp;(κ ≈ 0.4 geometric factor for short gradient-driven monopole). Units: V/m. Derived from spherical-wave solution under More-Complete Electrodynamics (MCE) with B = 0.<br>
-      • Media attenuation α is deliberately reduced relative to classical skin-effect values, reflecting the claimed SLW property of penetrating conductive media with far lower loss (see Hively US 9,306,527 and Zimmerman QEX 2011). Space uses pure geometric 1/r spreading.<br>
-      • Charts show amplitude vs distance on log–log axes out to 500 km. Values are order-of-magnitude estimates for educational / exploratory simulation; actual experimental calibration requires measured antenna factors and detector responsivity.
+      • <strong>Nikolova–Zimmerman:</strong> |A|(r) ≈ (μ₀ · I · L<sub>eff</sub>)/(4π r) · e<sup>−αr</sup> &nbsp;&nbsp;(L<sub>eff</sub> = 0.15 m). Units: V·s/m (Wb/m). Propagation speed set by the Lorenz gauge of the paper (Eq. 9): ∇·A = −(1/c²)∂φ/∂t with c of the medium.<br>
+      • <strong>Hively:</strong> |E<sub>r</sub>|(r) ≈ (η₀ · I · κ)/(2π r) · e<sup>−αr</sup> &nbsp;&nbsp;(κ ≈ 0.4). Units: V/m. Spherical-wave solution under More-Complete Electrodynamics (MCE) with B ≈ 0.<br>
+      • Media α values are residual only (no skin-effect scaling). Space and air are essentially pure 1/r geometric spreading. Charts are log–log out to 500 km.
     </div>
   </div>
 
@@ -281,16 +281,19 @@ const ETA0 = 376.730313668;
 const L_EFF = 0.15;
 const KAPPA = 0.40;
 
+// Residual attenuation only — deliberately NOT the classical skin-effect values.
+// Longitudinal potential / SLW waves do not suffer ordinary skin effect.
 const MEDIA = {
-  air:        { alpha: 1e-5 },
-  seawater:   { alpha: 0.008 },
-  earth:      { alpha: 0.004 },
+  air:        { alpha: 1e-5 },      // residual atmospheric
+  seawater:   { alpha: 5e-4 },      // residual only (no skin effect)
+  earth:      { alpha: 2e-4 },      // residual only (no skin effect)
   space:      { alpha: 0.0 },
-  transition: { alpha: 2e-6 }
+  transition: { alpha: 1e-5 }
 };
 
 function alphaOf(mediaKey, r) {
   if (mediaKey === "transition") {
+    // residual falls with altitude
     return 1e-5 * Math.exp(-(r / 1000) / 80);
   }
   return MEDIA[mediaKey].alpha;
@@ -414,8 +417,7 @@ function updateCharts(I, media) {
   hChart.update("none");
 }
 
-// ========== FIXED CANVAS HANDLING ==========
-// Size only on load and resize. Animation only draws.
+// Canvas sizing only on load / resize
 let nzCtx = null, hCtx = null;
 let canvasW = 0, canvasH = 0;
 let animT = 0;
