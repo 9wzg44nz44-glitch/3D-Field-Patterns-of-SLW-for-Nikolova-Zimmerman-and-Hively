@@ -15,7 +15,12 @@
     --muted: #8b95a8;
     --border: #2a3347;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: var(--bg);
@@ -30,6 +35,7 @@
     margin-bottom: 0.3rem;
     background: linear-gradient(90deg, var(--accent-nz), var(--accent-h));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .subtitle {
@@ -43,6 +49,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 1.2rem;
     max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
   }
   @media (max-width: 900px) {
@@ -53,6 +60,8 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 1.2rem;
+    min-width: 0;
+    overflow: hidden;
   }
   .panel h2 {
     font-size: 1.15rem;
@@ -66,15 +75,17 @@
   .controls {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1rem;
     margin-bottom: 0.5rem;
+    min-width: 0;
   }
   .control-group {
     background: #0f1422;
     padding: 0.9rem;
     border-radius: 8px;
     border: 1px solid var(--border);
+    min-width: 0;
   }
   label {
     display: block;
@@ -103,6 +114,7 @@
   }
   .schematic {
     height: 220px;
+    width: 100%;
     background: #0a0e17;
     border-radius: 8px;
     margin-bottom: 1rem;
@@ -111,9 +123,10 @@
     border: 1px solid var(--border);
   }
   canvas.wave-canvas {
-    width: 100%;
-    height: 100%;
     display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
   }
   .metrics {
     display: grid;
@@ -126,18 +139,26 @@
     padding: 0.6rem 0.8rem;
     border-radius: 6px;
     border-left: 3px solid;
+    min-width: 0;
+    overflow: hidden;
   }
   .nz .metric { border-color: var(--accent-nz); }
   .hively .metric { border-color: var(--accent-h); }
   .metric-label { font-size: 0.75rem; color: var(--muted); }
   .metric-value {
     font-family: ui-monospace, monospace;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 600;
+    word-break: break-all;
   }
   .chart-container {
     height: 260px;
+    width: 100%;
     position: relative;
+    overflow: hidden;
+  }
+  .chart-container canvas {
+    max-width: 100% !important;
   }
   .note {
     grid-column: 1 / -1;
@@ -170,7 +191,6 @@
   </p>
 
   <div class="grid">
-    <!-- Controls -->
     <div class="controls panel">
       <div class="control-group">
         <label for="current">Transmitter Current I (A) — peak</label>
@@ -199,7 +219,6 @@
       </div>
     </div>
 
-    <!-- NZ Panel -->
     <div class="panel nz">
       <h2><span class="badge badge-nz">NZ</span> Nikolova–Zimmerman Configuration</h2>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.8rem;">
@@ -223,7 +242,6 @@
       </div>
     </div>
 
-    <!-- Hively Panel -->
     <div class="panel hively">
       <h2><span class="badge badge-h">Hively</span> Hively Configuration (EED / MCE)</h2>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.8rem;">
@@ -258,25 +276,22 @@
   </div>
 
 <script>
-// ========== Physics Constants & Models ==========
-const MU0 = 1.25663706212e-6;      // H/m
-const ETA0 = 376.730313668;        // Ω free space
-const L_EFF = 0.15;                // m effective radiating length
-const KAPPA = 0.40;                // dimensionless geometric factor for Hively gradient drive
+const MU0 = 1.25663706212e-6;
+const ETA0 = 376.730313668;
+const L_EFF = 0.15;
+const KAPPA = 0.40;
 
 const MEDIA = {
-  air:        { alpha: 1e-5,  name: "Atmospheric Air" },
-  seawater:   { alpha: 0.008, name: "Seawater (SLW-reduced)" },
-  earth:      { alpha: 0.004, name: "Earth Crust" },
-  space:      { alpha: 0.0,   name: "Outer Space" },
-  transition: { alpha: 2e-6,  name: "Air→Space Transition" }  // average soft
+  air:        { alpha: 1e-5 },
+  seawater:   { alpha: 0.008 },
+  earth:      { alpha: 0.004 },
+  space:      { alpha: 0.0 },
+  transition: { alpha: 2e-6 }
 };
 
 function alphaOf(mediaKey, r) {
   if (mediaKey === "transition") {
-    // soft transition: higher near ground, lower at altitude
-    const altKm = r / 1000;
-    return 1e-5 * Math.exp(-altKm / 80);  // scale height ~80 km
+    return 1e-5 * Math.exp(-(r / 1000) / 80);
   }
   return MEDIA[mediaKey].alpha;
 }
@@ -304,16 +319,13 @@ function formatDist(r) {
   return (r * 100).toFixed(1) + " cm";
 }
 
-// ========== UI Bindings ==========
 const currentSlider = document.getElementById("current");
 const distSlider = document.getElementById("distance");
 const mediaSelect = document.getElementById("media");
 const freqSlider = document.getElementById("freq");
-
 const currentVal = document.getElementById("currentVal");
 const distanceVal = document.getElementById("distanceVal");
 const freqVal = document.getElementById("freqVal");
-
 const nzA = document.getElementById("nzA");
 const nzAtt = document.getElementById("nzAtt");
 const hE = document.getElementById("hE");
@@ -331,23 +343,17 @@ function update() {
   freqVal.textContent = fGHz.toFixed(1) + " GHz";
 
   const att = Math.exp(-alpha * r);
-  const A = calcA(I, r, alpha);
-  const E = calcE(I, r, alpha);
-
-  nzA.innerHTML = formatSci(A) + " V·s/m";
+  nzA.innerHTML = formatSci(calcA(I, r, alpha)) + " V·s/m";
   nzAtt.textContent = att.toExponential(3);
-  hE.innerHTML = formatSci(E) + " V/m";
+  hE.innerHTML = formatSci(calcE(I, r, alpha)) + " V/m";
   hAtt.textContent = att.toExponential(3);
 
   updateCharts(I, media);
-  drawSchematics(I, r, alpha);
 }
 
-// ========== Charts ==========
 const distPoints = (() => {
   const pts = [];
   for (let i = 0; i <= 80; i++) {
-    // log spacing from 1 m to 500 km
     const logR = Math.log10(1) + (Math.log10(5e5) - Math.log10(1)) * (i / 80);
     pts.push(Math.pow(10, logR));
   }
@@ -375,10 +381,11 @@ function makeChart(ctx, color, label, dataFn) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       scales: {
         x: {
           title: { display: true, text: "Distance r", color: "#8b95a8" },
-          ticks: { color: "#8b95a8", maxTicksLimit: 10 },
+          ticks: { color: "#8b95a8", maxTicksLimit: 8 },
           grid: { color: "#1e2638" }
         },
         y: {
@@ -391,9 +398,7 @@ function makeChart(ctx, color, label, dataFn) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: ctx => ctx.parsed.y.toExponential(3)
-          }
+          callbacks: { label: ctx => ctx.parsed.y.toExponential(3) }
         }
       }
     }
@@ -401,6 +406,7 @@ function makeChart(ctx, color, label, dataFn) {
 }
 
 function updateCharts(I, media) {
+  if (!nzChart || !hChart) return;
   const alphaFn = r => alphaOf(media, r);
   nzChart.data.datasets[0].data = distPoints.map(r => calcA(I, r, alphaFn(r)));
   hChart.data.datasets[0].data = distPoints.map(r => calcE(I, r, alphaFn(r)));
@@ -408,115 +414,117 @@ function updateCharts(I, media) {
   hChart.update("none");
 }
 
-// ========== Schematic Canvases (animated wave visualization) ==========
-const nzCtx = document.getElementById("nzCanvas").getContext("2d");
-const hCtx = document.getElementById("hCanvas").getContext("2d");
+// ========== FIXED CANVAS HANDLING ==========
+// Size only on load and resize. Animation only draws.
+let nzCtx = null, hCtx = null;
+let canvasW = 0, canvasH = 0;
 let animT = 0;
 
-function resizeCanvas(c) {
-  const rect = c.parentElement.getBoundingClientRect();
-  c.width = rect.width * devicePixelRatio;
-  c.height = rect.height * devicePixelRatio;
-  c.style.width = rect.width + "px";
-  c.style.height = rect.height + "px";
-  return c.getContext("2d");
+function sizeCanvases() {
+  const nzC = document.getElementById("nzCanvas");
+  const hC  = document.getElementById("hCanvas");
+  const parent = nzC.parentElement;
+  const rect = parent.getBoundingClientRect();
+  const cssW = Math.floor(rect.width) || 300;
+  const cssH = Math.floor(rect.height) || 220;
+  const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+
+  [nzC, hC].forEach(c => {
+    c.width  = Math.floor(cssW * dpr);
+    c.height = Math.floor(cssH * dpr);
+    c.style.width  = cssW + "px";
+    c.style.height = cssH + "px";
+  });
+
+  nzCtx = nzC.getContext("2d");
+  hCtx  = hC.getContext("2d");
+  canvasW = nzC.width;
+  canvasH = nzC.height;
 }
 
 function drawWireAndWaves(ctx, w, h, colorLong, colorTrans, I, phase) {
+  if (!ctx) return;
+  const dpr = w / (parseFloat(ctx.canvas.style.width) || 1);
+
   ctx.clearRect(0, 0, w, h);
   const cx = w * 0.5;
   const wireTop = h * 0.18;
   const wireBot = h * 0.85;
-  const wireX = cx;
 
-  // ground / base
   ctx.fillStyle = "#2a3347";
-  ctx.fillRect(cx - 40*devicePixelRatio, wireBot, 80*devicePixelRatio, 12*devicePixelRatio);
+  ctx.fillRect(cx - 40 * dpr, wireBot, 80 * dpr, 12 * dpr);
 
-  // wire
   ctx.strokeStyle = "#c0c8d8";
-  ctx.lineWidth = 4 * devicePixelRatio;
+  ctx.lineWidth = 4 * dpr;
   ctx.beginPath();
-  ctx.moveTo(wireX, wireBot);
-  ctx.lineTo(wireX, wireTop);
+  ctx.moveTo(cx, wireBot);
+  ctx.lineTo(cx, wireTop);
   ctx.stroke();
 
-  // tip glow
-  const tipGlow = ctx.createRadialGradient(wireX, wireTop, 0, wireX, wireTop, 30*devicePixelRatio);
+  const tipGlow = ctx.createRadialGradient(cx, wireTop, 0, cx, wireTop, 30 * dpr);
   tipGlow.addColorStop(0, colorLong + "cc");
   tipGlow.addColorStop(1, colorLong + "00");
   ctx.fillStyle = tipGlow;
   ctx.beginPath();
-  ctx.arc(wireX, wireTop, 30*devicePixelRatio, 0, Math.PI*2);
+  ctx.arc(cx, wireTop, 30 * dpr, 0, Math.PI * 2);
   ctx.fill();
 
-  // Transverse rings (around wire body)
-  const nRings = 5;
-  for (let i = 0; i < nRings; i++) {
-    const y = wireTop + (wireBot - wireTop) * (0.25 + 0.55 * i / (nRings-1));
-    const rad = (18 + i * 4) * devicePixelRatio * (0.7 + 0.3 * Math.sin(phase + i));
-    ctx.strokeStyle = colorTrans + Math.floor(120 + 80 * Math.sin(phase*1.5 + i)).toString(16);
-    ctx.lineWidth = 1.5 * devicePixelRatio;
+  for (let i = 0; i < 5; i++) {
+    const y = wireTop + (wireBot - wireTop) * (0.25 + 0.55 * i / 4);
+    const rad = (18 + i * 4) * dpr * (0.7 + 0.3 * Math.sin(phase + i));
+    const aHex = Math.floor(120 + 80 * Math.sin(phase * 1.5 + i)).toString(16).padStart(2, "0");
+    ctx.strokeStyle = colorTrans + aHex;
+    ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
-    ctx.ellipse(wireX, y, rad, rad * 0.35, 0, 0, Math.PI*2);
+    ctx.ellipse(cx, y, rad, rad * 0.35, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // Longitudinal wavefronts from tip (spherical-ish expanding)
-  const nWaves = 6;
-  for (let i = 0; i < nWaves; i++) {
-    const prog = ((phase * 0.4 + i / nWaves) % 1);
-    const rad = 10 * devicePixelRatio + prog * (w * 0.45);
-    const alpha = 1 - prog;
-    ctx.strokeStyle = colorLong + Math.floor(alpha * 200).toString(16).padStart(2,"0");
-    ctx.lineWidth = 2 * devicePixelRatio * alpha;
+  for (let i = 0; i < 6; i++) {
+    const prog = ((phase * 0.4 + i / 6) % 1);
+    const rad = 10 * dpr + prog * (w * 0.45);
+    const a = 1 - prog;
+    const aHex = Math.floor(a * 200).toString(16).padStart(2, "0");
+    ctx.strokeStyle = colorLong + aHex;
+    ctx.lineWidth = 2 * dpr * a;
     ctx.beginPath();
-    // upper hemisphere style arcs
-    ctx.arc(wireX, wireTop, rad, -Math.PI*0.85, -Math.PI*0.15);
+    ctx.arc(cx, wireTop, rad, -Math.PI * 0.85, -Math.PI * 0.15);
     ctx.stroke();
-    // radial arrows feel
     if (i % 2 === 0) {
-      const ang = -Math.PI/2 + (i-2.5)*0.25;
-      const ax = wireX + Math.cos(ang) * rad * 0.9;
-      const ay = wireTop + Math.sin(ang) * rad * 0.9;
+      const ang = -Math.PI / 2 + (i - 2.5) * 0.25;
       ctx.beginPath();
-      ctx.moveTo(wireX + Math.cos(ang)*rad*0.6, wireTop + Math.sin(ang)*rad*0.6);
-      ctx.lineTo(ax, ay);
+      ctx.moveTo(cx + Math.cos(ang) * rad * 0.6, wireTop + Math.sin(ang) * rad * 0.6);
+      ctx.lineTo(cx + Math.cos(ang) * rad * 0.9, wireTop + Math.sin(ang) * rad * 0.9);
       ctx.stroke();
     }
   }
 
-  // intensity label
   ctx.fillStyle = "#8b95a8";
-  ctx.font = (11 * devicePixelRatio) + "px sans-serif";
-  ctx.fillText("I = " + I.toFixed(1) + " A", 12*devicePixelRatio, 20*devicePixelRatio);
+  ctx.font = (11 * dpr) + "px sans-serif";
+  ctx.fillText("I = " + I.toFixed(1) + " A", 12 * dpr, 20 * dpr);
 }
 
-function drawSchematics(I, r, alpha) {
-  const nzC = document.getElementById("nzCanvas");
-  const hC = document.getElementById("hCanvas");
-  const nctx = resizeCanvas(nzC);
-  const hctx = resizeCanvas(hC);
-  const w = nzC.width, hgt = nzC.height;
-  drawWireAndWaves(nctx, w, hgt, "#00e5a0", "#4fc3f7", I, animT);
-  drawWireAndWaves(hctx, w, hgt, "#c77dff", "#ff8a65", I, animT + 1.2);
+function drawSchematics() {
+  if (!nzCtx || !hCtx) return;
+  const I = parseFloat(currentSlider.value);
+  drawWireAndWaves(nzCtx, canvasW, canvasH, "#00e5a0", "#4fc3f7", I, animT);
+  drawWireAndWaves(hCtx,  canvasW, canvasH, "#c77dff", "#ff8a65", I, animT + 1.2);
 }
 
 function animate() {
   animT += 0.04;
-  const I = parseFloat(currentSlider.value);
-  const r = parseFloat(distSlider.value);
-  const alpha = alphaOf(mediaSelect.value, r);
-  drawSchematics(I, r, alpha);
+  drawSchematics();
   requestAnimationFrame(animate);
 }
 
-// init
 window.addEventListener("load", () => {
+  sizeCanvases();
+
   const nzC = document.getElementById("nzChart").getContext("2d");
-  const hC = document.getElementById("hChart").getContext("2d");
+  const hC  = document.getElementById("hChart").getContext("2d");
   nzChart = makeChart(nzC, "#00e5a0", "|A| (V·s/m)", r => calcA(5, r, 1e-5));
-  hChart = makeChart(hC, "#c77dff", "|E| (V/m)", r => calcE(5, r, 1e-5));
+  hChart  = makeChart(hC,  "#c77dff", "|E| (V/m)",   r => calcE(5, r, 1e-5));
+
   update();
   animate();
 });
@@ -528,8 +536,13 @@ window.addEventListener("load", () => {
   freqSlider.addEventListener(ev, update);
 });
 
+let resizeTimer = null;
 window.addEventListener("resize", () => {
-  update();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    sizeCanvases();
+    update();
+  }, 150);
 });
 </script>
 </body>
